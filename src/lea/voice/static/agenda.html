@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0f766e">
+<title>Agenda de Léa</title>
+<style>
+  :root {
+    --bg: #f4f7f6; --card: #ffffff; --ink: #12302c; --muted: #5b6f6b; --line: #e3ebe9;
+    --accent: #0f766e; --accent-ink: #ffffff; --danger: #b42318; --danger-bg: #fdecea;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #0c1614; --card: #13221f; --ink: #e6f2ef; --muted: #93aaa5; --line: #1f3330;
+            --accent: #2dd4bf; --accent-ink: #062b26; --danger: #f97066; --danger-bg: #3a1916; }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font: 16px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    padding: 16px; padding-bottom: max(16px, env(safe-area-inset-bottom));
+  }
+  main { max-width: 560px; margin: 0 auto; }
+  header { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 4px 0 16px; }
+  h1 { font-size: 22px; margin: 0; }
+  a.retour { color: var(--accent); text-decoration: none; font-weight: 600; font-size: 15px; }
+  .barre { display: flex; gap: 8px; align-items: center; margin-bottom: 16px; flex-wrap: wrap; }
+  button {
+    border: 0; border-radius: 999px; padding: 10px 16px; font: inherit; font-weight: 600;
+    background: var(--accent); color: var(--accent-ink); cursor: pointer;
+  }
+  button.secondaire { background: var(--card); color: var(--ink); border: 1px solid var(--line); }
+  #maj { font-size: 13px; color: var(--muted); margin-left: auto; }
+  h2 { font-size: 14px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted);
+       margin: 22px 0 8px; }
+  .rdv { background: var(--card); border-radius: 16px; padding: 14px 16px; margin-bottom: 10px;
+         display: grid; grid-template-columns: 64px 1fr; gap: 4px 12px; border: 1px solid var(--line); }
+  .rdv.passe { opacity: .55; }
+  .heure { font-size: 20px; font-weight: 700; grid-row: span 3; }
+  .nom { font-weight: 650; }
+  .motif, .details { color: var(--muted); font-size: 14px; }
+  .details a { color: var(--accent); text-decoration: none; font-weight: 600; }
+  .badge { display: inline-block; font-size: 12px; font-weight: 700; border-radius: 999px;
+           padding: 2px 8px; background: var(--danger-bg); color: var(--danger); margin-left: 6px; }
+  .urgence { background: var(--danger-bg); color: var(--danger); border-radius: 12px;
+             padding: 10px 14px; margin-bottom: 8px; font-size: 14px; }
+  .vide { text-align: center; color: var(--muted); padding: 32px 16px; background: var(--card);
+          border-radius: 16px; border: 1px dashed var(--line); }
+  #acces { background: var(--card); border-radius: 16px; padding: 20px; display: none; }
+  #acces.visible { display: block; }
+  #acces input { width: 100%; font: inherit; font-size: 22px; letter-spacing: .3em; text-align: center;
+                 padding: 10px; border-radius: 12px; border: 2px solid var(--line);
+                 background: var(--bg); color: var(--ink); margin: 10px 0; }
+  #erreur { color: var(--danger); font-size: 14px; }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>📅 Agenda de Léa</h1>
+    <a class="retour" href="/">📞 Appeler Léa</a>
+  </header>
+
+  <div id="acces">
+    <label for="code">Code d'accès (affiché sur l'ordinateur)</label>
+    <input id="code" inputmode="numeric" autocomplete="one-time-code" maxlength="12">
+    <button id="valider" type="button">Voir l'agenda</button>
+  </div>
+
+  <div class="barre" id="barre" hidden>
+    <button id="actualiser" type="button">Actualiser</button>
+    <button id="passes" class="secondaire" type="button">Afficher les passés</button>
+    <span id="maj"></span>
+  </div>
+  <p id="erreur" role="alert"></p>
+  <div id="urgences"></div>
+  <div id="liste" aria-live="polite"></div>
+</main>
+
+<script>
+const $ = (id) => document.getElementById(id);
+let code = new URLSearchParams(location.search).get("code") || (() => {
+  try { return localStorage.getItem("lea-code") || ""; } catch (_) { return ""; }
+})();
+let avecPasses = false;
+
+function el(tag, cls, texte) {
+  const e = document.createElement(tag);
+  if (cls) e.className = cls;
+  if (texte != null) e.textContent = texte;
+  return e;
+}
+
+async function charger() {
+  $("erreur").textContent = "";
+  let r;
+  try {
+    r = await fetch(`/api/agenda?code=${encodeURIComponent(code)}&passes=${avecPasses}`);
+  } catch (_) {
+    $("erreur").textContent = "Serveur injoignable : le Mac est-il allumé ?";
+    return;
+  }
+  if (r.status === 403) {
+    $("acces").classList.add("visible"); $("barre").hidden = true;
+    if (code) $("erreur").textContent = "Code d'accès incorrect.";
+    return;
+  }
+  try { localStorage.setItem("lea-code", code); } catch (_) {}
+  if (new URLSearchParams(location.search).get("code")) history.replaceState(null, "", location.pathname);
+  $("acces").classList.remove("visible"); $("barre").hidden = false;
+  afficher(await r.json());
+  $("maj").textContent = "Mis à jour à " + new Date().toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
+}
+
+function afficher(d) {
+  const u = $("urgences"); u.textContent = "";
+  for (const x of d.urgences || []) {
+    const quand = new Date(x.horodatage).toLocaleString("fr-FR", { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+    u.appendChild(el("div", "urgence", `⚠️ Urgence signalée ${quand} : « ${x.raison || "sans détail"} »`));
+  }
+
+  const liste = $("liste"); liste.textContent = "";
+  const rdvs = d.rendez_vous || [];
+  if (!rdvs.length) {
+    liste.appendChild(el("div", "vide", avecPasses
+      ? "Aucun rendez-vous sur les 30 derniers jours ni à venir."
+      : "Aucun rendez-vous à venir pour l'instant. Ils apparaîtront ici dès que Léa en aura pris un."));
+    return;
+  }
+  let jour = null;
+  for (const x of rdvs) {
+    if (x.jour !== jour) { jour = x.jour; liste.appendChild(el("h2", null, jour)); }
+    const c = el("div", "rdv" + (x.passe ? " passe" : ""));
+    c.appendChild(el("div", "heure", x.heure));
+    const nom = el("div", "nom", x.nom || "Sans nom");
+    if (x.urgence) nom.appendChild(el("span", "badge", "URGENCE"));
+    c.appendChild(nom);
+    const motif = [x.motif, x.depuis_quand && `depuis ${x.depuis_quand}`,
+                   x.douleur != null && `douleur ${x.douleur}/10`].filter(Boolean).join(" · ");
+    c.appendChild(el("div", "motif", motif));
+    const det = el("div", "details");
+    if (x.telephone) {
+      const a = el("a", null, "📞 " + x.telephone);
+      a.href = "tel:" + x.telephone.replace(/\s/g, "");
+      det.appendChild(a);
+    }
+    c.appendChild(det);
+    liste.appendChild(c);
+  }
+}
+
+$("valider").onclick = () => { code = $("code").value.trim(); charger(); };
+$("code").addEventListener("keydown", (e) => { if (e.key === "Enter") $("valider").click(); });
+$("actualiser").onclick = charger;
+$("passes").onclick = () => {
+  avecPasses = !avecPasses;
+  $("passes").textContent = avecPasses ? "Masquer les passés" : "Afficher les passés";
+  charger();
+};
+setInterval(() => { if (!document.hidden && !$("barre").hidden) charger(); }, 30000);
+charger();
+</script>
+</body>
+</html>

@@ -1,0 +1,9 @@
+.venv/
+.env
+data/
+models/
+tests/
+scripts/
+service-account*.json
+credentials.json
+token.json

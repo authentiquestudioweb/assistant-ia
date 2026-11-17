@@ -1,0 +1,354 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0f766e">
+<title>Appeler Léa</title>
+<style>
+  :root {
+    --bg: #f4f7f6; --card: #ffffff; --ink: #12302c; --muted: #5b6f6b;
+    --accent: #0f766e; --accent-ink: #ffffff; --danger: #b42318; --ring: #99d5cc;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #0c1614; --card: #13221f; --ink: #e6f2ef; --muted: #93aaa5;
+            --accent: #2dd4bf; --accent-ink: #062b26; --danger: #f97066; --ring: #1f5f56; }
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  body {
+    background: var(--bg); color: var(--ink);
+    font: 17px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    display: flex; align-items: center; justify-content: center;
+    padding: 16px; padding-bottom: max(16px, env(safe-area-inset-bottom));
+  }
+  main {
+    width: 100%; max-width: 420px; background: var(--card); border-radius: 24px;
+    padding: 32px 24px; text-align: center; box-shadow: 0 10px 40px rgb(0 0 0 / .08);
+  }
+  .avatar {
+    width: 112px; height: 112px; margin: 0 auto 16px; border-radius: 50%;
+    background: var(--accent); color: var(--accent-ink);
+    display: grid; place-items: center; font-size: 44px; font-weight: 700;
+    transition: box-shadow .15s ease;
+  }
+  .avatar.parle { box-shadow: 0 0 0 10px var(--ring); }
+  h1 { font-size: 24px; margin: 0 0 4px; }
+  .sous-titre { color: var(--muted); margin: 0 0 28px; }
+  button {
+    width: 100%; border: 0; border-radius: 999px; padding: 18px 20px;
+    font: inherit; font-weight: 650; cursor: pointer;
+    background: var(--accent); color: var(--accent-ink);
+  }
+  button.raccrocher { background: var(--danger); color: #fff; }
+  button:disabled { opacity: .55; cursor: wait; }
+  #statut { min-height: 1.5em; margin: 18px 0 0; color: var(--muted); font-size: 15px; }
+  #erreur { color: var(--danger); font-size: 15px; margin: 12px 0 0; }
+  .aide { margin-top: 24px; font-size: 13px; color: var(--muted); }
+  #fil { text-align: left; margin: 20px 0 0; display: flex; flex-direction: column; gap: 8px;
+         max-height: 40vh; overflow-y: auto; }
+  #fil:empty { display: none; }
+  .bulle { padding: 10px 14px; border-radius: 16px; font-size: 15px; max-width: 88%; }
+  .bulle.lea { background: var(--ring); align-self: flex-start; border-bottom-left-radius: 4px; }
+  .bulle.patient { background: var(--bg); align-self: flex-end; border-bottom-right-radius: 4px; }
+  #acces { display: none; margin: 0 0 16px; }
+  #acces.visible { display: block; }
+  #acces label { display: block; font-size: 14px; color: var(--muted); margin-bottom: 8px; }
+  #code {
+    width: 100%; font: inherit; font-size: 24px; letter-spacing: .3em; text-align: center;
+    padding: 12px; border-radius: 14px; border: 2px solid var(--ring);
+    background: var(--bg); color: var(--ink);
+  }
+  #mode { font-size: 12px; color: var(--muted); margin-top: 12px; }
+  #clavier { display: none; margin-top: 12px; }
+  #clavier.visible { display: block; }
+  #clavier .ligne { display: flex; gap: 8px; margin-top: 8px; }
+  #clavier input {
+    flex: 1; min-width: 0; font: inherit; font-size: 20px; letter-spacing: .08em; padding: 12px;
+    border-radius: 14px; border: 2px solid var(--ring); background: var(--bg); color: var(--ink);
+  }
+  #clavier .ligne button { width: auto; padding: 12px 18px; }
+  button.secondaire { background: transparent; color: var(--accent); border: 2px solid var(--ring);
+                      padding: 12px 20px; }
+</style>
+</head>
+<body>
+<main>
+  <div class="avatar" id="avatar" aria-hidden="true">L</div>
+  <h1>Léa</h1>
+  <p class="sous-titre">Réceptionniste du cabinet dentaire</p>
+  <div id="acces">
+    <label for="code">Code d'accès (affiché sur l'ordinateur)</label>
+    <input id="code" inputmode="numeric" autocomplete="one-time-code" maxlength="12">
+  </div>
+  <button id="bouton" type="button">📞 Appeler Léa</button>
+  <p id="statut" role="status" aria-live="polite"></p>
+  <p id="erreur" role="alert"></p>
+  <div id="clavier">
+    <button id="ouvrirClavier" class="secondaire" type="button">⌨️ Taper mon numéro</button>
+    <div class="ligne" id="saisie" hidden>
+      <input id="tel" type="tel" inputmode="tel" autocomplete="tel" placeholder="Votre numéro"
+             aria-label="Votre numéro de téléphone">
+      <button id="envoyerTel" type="button">Envoyer</button>
+    </div>
+  </div>
+  <div id="fil" aria-live="polite"></div>
+  <p class="aide">Parlez normalement, Léa vous répond après une courte pause.
+    Elle tourne sur un ordinateur : comptez quelques secondes de réflexion.
+    Elle ne vous entend pas pendant qu'elle parle.</p>
+  <p id="mode"></p>
+  <p class="aide"><a href="/agenda" style="color:var(--accent);font-weight:600;text-decoration:none">📅 Voir l'agenda</a></p>
+</main>
+<audio id="audio" autoplay playsinline></audio>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const bouton = $("bouton"), statut = $("statut"), erreur = $("erreur");
+const audio = $("audio"), avatar = $("avatar"), fil = $("fil");
+const champCode = $("code"), blocAcces = $("acces");
+
+// Réseau local (Wi-Fi) -> WebRTC direct ; adresse publique -> WebSocket via le tunnel.
+const params = new URLSearchParams(location.search);
+const local = /^(localhost|127\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/.test(location.hostname);
+const MODE = params.get("mode") || (local ? "webrtc" : "ws");
+$("mode").textContent = MODE === "ws" ? "Connexion en ligne" : "Connexion Wi-Fi locale";
+
+let code = params.get("code") || lireCode();
+if (params.get("code")) { garderCode(code); history.replaceState(null, "", location.pathname); }
+champCode.value = code || "";
+
+let appel = null; // { raccrocher() }
+
+function lireCode() { try { return localStorage.getItem("lea-code") || ""; } catch (_) { return ""; } }
+function garderCode(c) { try { localStorage.setItem("lea-code", c); } catch (_) {} }
+function etat(t) { statut.textContent = t; }
+
+function afficher(d) {
+  if (!d || d.type !== "transcript") return;
+  const b = document.createElement("div");
+  b.className = "bulle " + (d.role === "lea" ? "lea" : "patient");
+  b.textContent = d.text;
+  fil.appendChild(b);
+  fil.scrollTop = fil.scrollHeight;
+  etat(d.role === "patient" ? "Léa réfléchit…" : "En ligne avec Léa");
+}
+
+async function verifierAcces() {
+  const r = await fetch("/api/acces?code=" + encodeURIComponent(champCode.value.trim()));
+  if (r.status === 403) {
+    blocAcces.classList.add("visible");
+    throw new Error(champCode.value ? "Code d'accès incorrect." : "Entrez le code d'accès.");
+  }
+  const d = await r.json();
+  if (d.occupe) throw new Error("Léa est déjà en ligne avec quelqu'un. Réessayez dans un instant.");
+  code = champCode.value.trim(); garderCode(code);
+}
+
+async function ouvrirMicro() {
+  if (!window.isSecureContext || !navigator.mediaDevices) {
+    throw new Error("Le micro exige une page en https:// (voir le README).");
+  }
+  return navigator.mediaDevices.getUserMedia({
+    audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true, channelCount: 1 },
+  });
+}
+
+// ---------- Anneau autour de l'avatar quand Léa parle ----------
+function anneau(actif) { avatar.classList.toggle("parle", actif); }
+
+// ---------- Mode WebRTC (Wi-Fi local) ----------
+async function appelWebRTC(micro) {
+  const pc = new RTCPeerConnection({ iceServers: [] });
+  micro.getTracks().forEach((t) => pc.addTrack(t, micro));
+  let ctx = null;
+  pc.ontrack = (e) => {
+    audio.srcObject = e.streams[0];
+    try {
+      ctx = new (window.AudioContext || window.webkitAudioContext)();
+      const an = ctx.createAnalyser(); an.fftSize = 512;
+      ctx.createMediaStreamSource(e.streams[0]).connect(an);
+      const buf = new Uint8Array(an.fftSize);
+      const boucle = () => {
+        if (pc.connectionState === "closed") return;
+        an.getByteTimeDomainData(buf);
+        let s = 0; for (const v of buf) s += (v - 128) ** 2;
+        anneau(Math.sqrt(s / buf.length) > 4);
+        requestAnimationFrame(boucle);
+      };
+      boucle();
+    } catch (_) {}
+  };
+  pc.onconnectionstatechange = () => {
+    if (pc.connectionState === "connected") etat("En ligne avec Léa");
+    if (["failed", "disconnected"].includes(pc.connectionState)) fin("Connexion perdue.");
+  };
+  const canal = pc.createDataChannel("chat");
+  canal.onmessage = (e) => { try { afficher(JSON.parse(e.data)); } catch (_) {} };
+
+  await pc.setLocalDescription(await pc.createOffer());
+  await new Promise((ok) => {
+    if (pc.iceGatheringState === "complete") return ok();
+    pc.addEventListener("icegatheringstatechange", () => pc.iceGatheringState === "complete" && ok());
+    setTimeout(ok, 3000);
+  });
+  const r = await fetch("/api/offer", {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ sdp: pc.localDescription.sdp, type: pc.localDescription.type, code }),
+  });
+  if (!r.ok) throw new Error((await r.json().catch(() => ({}))).erreur || "Refusé (" + r.status + ")");
+  await pc.setRemoteDescription(await r.json());
+  return {
+    envoyer(obj) { if (canal.readyState === "open") canal.send(JSON.stringify(obj)); },
+    raccrocher() { pc.close(); if (ctx) ctx.close(); audio.srcObject = null; },
+  };
+}
+
+// ---------- Mode WebSocket (en ligne, 4G/5G) ----------
+// Micro -> PCM 16 bits 16 kHz ; voix de Léa <- PCM 16 bits 24 kHz.
+const CAPTEUR = `
+class Capteur extends AudioWorkletProcessor {
+  constructor() { super(); this.buf = []; this.pas = sampleRate / 16000; this.pos = 0; this.somme = 0; this.n = 0; }
+  process(entrees) {
+    const x = entrees[0] && entrees[0][0];
+    if (x) {
+      // Moyenne des échantillons de chaque intervalle : garder un échantillon sur trois
+      // déformerait le son (repliement) et tromperait la reconnaissance vocale.
+      for (let i = 0; i < x.length; i++) {
+        this.somme += x[i]; this.n++; this.pos++;
+        if (this.pos >= this.pas) {
+          this.buf.push(this.somme / this.n);
+          this.somme = 0; this.n = 0; this.pos -= this.pas;
+        }
+      }
+      if (this.buf.length >= 320) {             // 20 ms à 16 kHz
+        const pcm = new Int16Array(this.buf.length);
+        for (let i = 0; i < pcm.length; i++) pcm[i] = Math.max(-1, Math.min(1, this.buf[i])) * 0x7fff;
+        this.port.postMessage(pcm.buffer, [pcm.buffer]);
+        this.buf = [];
+      }
+    }
+    return true;
+  }
+}
+registerProcessor("capteur", Capteur);`;
+
+async function appelWebSocket(micro) {
+  const ctx = new (window.AudioContext || window.webkitAudioContext)();
+  await ctx.resume();
+  const url = (location.protocol === "https:" ? "wss://" : "ws://") + location.host +
+              "/ws?code=" + encodeURIComponent(code);
+  const ws = new WebSocket(url);
+  ws.binaryType = "arraybuffer";
+
+  let finLecture = 0;           // instant (horloge audio) où Léa aura fini de parler
+  const SILENCE = new Int16Array(320).buffer;
+
+  await ctx.audioWorklet.addModule(URL.createObjectURL(new Blob([CAPTEUR], { type: "text/javascript" })));
+  const source = ctx.createMediaStreamSource(micro);
+  const capteur = new AudioWorkletNode(ctx, "capteur");
+  source.connect(capteur);
+  capteur.port.onmessage = (e) => {
+    if (ws.readyState !== WebSocket.OPEN) return;
+    // Micro coupé pendant que Léa parle (+0,2 s) : elle ne s'entend pas elle-même.
+    const leaParle = ctx.currentTime < finLecture + 0.2;
+    anneau(ctx.currentTime < finLecture);
+    ws.send(leaParle ? SILENCE : e.data);
+  };
+
+  ws.onmessage = (e) => {
+    if (typeof e.data === "string") { try { afficher(JSON.parse(e.data)); } catch (_) {} return; }
+    const pcm = new Int16Array(e.data);
+    if (!pcm.length) return;
+    const buf = ctx.createBuffer(1, pcm.length, 24000);
+    const ch = buf.getChannelData(0);
+    for (let i = 0; i < pcm.length; i++) ch[i] = pcm[i] / 0x8000;
+    const src = ctx.createBufferSource();
+    src.buffer = buf; src.connect(ctx.destination);
+    const debut = Math.max(ctx.currentTime + 0.05, finLecture);
+    src.start(debut);
+    finLecture = debut + buf.duration;
+  };
+
+  await new Promise((ok, ko) => {
+    ws.onopen = ok;
+    ws.onerror = () => ko(new Error("Connexion impossible."));
+    ws.onclose = (e) => ko(new Error(e.reason === "occupe" ? "Léa est déjà en ligne." :
+                                     e.reason === "code" ? "Code d'accès incorrect." : "Connexion refusée."));
+  });
+  etat("En ligne avec Léa");
+  ws.onclose = () => fin(appel ? "Appel terminé." : "");
+  return {
+    envoyer(obj) { if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(obj)); },
+    raccrocher() {
+      ws.onclose = null;
+      try { ws.close(); } catch (_) {}
+      try { source.disconnect(); capteur.disconnect(); } catch (_) {}
+      ctx.close();
+    },
+  };
+}
+
+// ---------- Bouton ----------
+async function appeler() {
+  erreur.textContent = ""; fil.textContent = "";
+  bouton.disabled = true;
+  let micro = null;
+  try {
+    etat("Vérification…");
+    await verifierAcces();
+    etat("Autorisation du micro…");
+    micro = await ouvrirMicro();
+    etat("Connexion…");
+    const a = MODE === "ws" ? await appelWebSocket(micro) : await appelWebRTC(micro);
+    appel = {
+      envoyer: (obj) => a.envoyer(obj),
+      raccrocher() { a.raccrocher(); micro.getTracks().forEach((t) => t.stop()); },
+    };
+    blocAcces.classList.remove("visible");
+    $("clavier").classList.add("visible");
+    bouton.textContent = "Raccrocher";
+    bouton.classList.add("raccrocher");
+  } catch (e) {
+    if (micro) micro.getTracks().forEach((t) => t.stop());
+    fin(e.name === "NotAllowedError"
+      ? "Micro refusé : autorisez-le dans les réglages du navigateur."
+      : e.message);
+  } finally {
+    bouton.disabled = false;
+  }
+}
+
+function fin(message) {
+  if (appel) { const a = appel; appel = null; a.raccrocher(); }
+  anneau(false);
+  $("clavier").classList.remove("visible");
+  $("saisie").hidden = true;
+  $("tel").value = "";
+  bouton.textContent = "📞 Appeler Léa";
+  bouton.classList.remove("raccrocher");
+  bouton.disabled = false;
+  etat("");
+  if (message) erreur.textContent = message;
+}
+
+bouton.addEventListener("click", () => (appel ? fin("") : appeler()));
+
+// Numéro tapé : envoyé tel quel à Léa (la reconnaissance vocale des chiffres est fragile).
+$("ouvrirClavier").onclick = () => { $("saisie").hidden = false; $("tel").focus(); };
+function envoyerTel() {
+  const chiffres = $("tel").value.replace(/[^\d+]/g, "");
+  if (!appel || chiffres.replace("+", "").length < 8) {
+    erreur.textContent = "Numéro incomplet : au moins 8 chiffres.";
+    return;
+  }
+  erreur.textContent = "";
+  appel.envoyer({ type: "telephone", valeur: chiffres.match(/.{1,2}/g).join(" ") });
+  $("tel").value = ""; $("saisie").hidden = true;
+  etat("Léa réfléchit…");
+}
+$("envoyerTel").onclick = envoyerTel;
+$("tel").addEventListener("keydown", (e) => { if (e.key === "Enter") envoyerTel(); });
+champCode.addEventListener("keydown", (e) => { if (e.key === "Enter") appeler(); });
+</script>
+</body>
+</html>
